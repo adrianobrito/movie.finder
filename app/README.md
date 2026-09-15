@@ -93,9 +93,21 @@ People are bulk indexed first. Movie batches use OpenSearch realtime multi-get t
 
 The Testcontainers integration tests use the same OpenSearch image and exercise index creation, canonical bulk indexing, exact ID filters, prefix/alias matching, and fuzzy title matching. They run automatically when a Docker-compatible container runtime is available.
 
-The Java [person resolver](src/main/java/com/moviefinder/search/PersonResolver.java) searches the `people` index for exact and normalized names first, then prefix matches, then limited fuzzy matches. It returns the IMDb person ID and display name when exactly one person matches the best available tier. Multiple matches return an explicit `AMBIGUOUS` status, candidate IDs and names, and the full candidate count (up to 20 candidates are shown); no match returns `NOT_FOUND`. [Movie person search](src/main/java/com/moviefinder/search/MoviePersonSearch.java) queries `castPersonIds` or `directorPersonIds` only after unique resolution and does not query movies for ambiguous or missing people. These Java services provide the person-filtering behavior for the forthcoming search API; movie results are currently sorted by ID until ranking and pagination are integrated.
+The Java [person resolver](src/main/java/com/moviefinder/search/PersonResolver.java) searches the `people` index for exact and normalized names first, then prefix matches, then limited fuzzy matches. It returns the IMDb person ID and display name when exactly one person matches the best available tier. Multiple matches return an explicit `AMBIGUOUS` status, candidate IDs and names, and the full candidate count (up to 20 candidates are shown); no match returns `NOT_FOUND`. [Movie person search](src/main/java/com/moviefinder/search/MoviePersonSearch.java) queries `castPersonIds` or `directorPersonIds` only after unique resolution and does not query movies for ambiguous or missing people.
 
-### License and attribution
+## Movie search API
+
+With OpenSearch running and the canonical data indexed, send `POST /api/movies/search` with any combination of `name`, `actors`, and `directors`:
+
+```powershell
+curl.exe -X POST http://localhost:8080/api/movies/search -H "Content-Type: application/json" -d '{"name":"Inception","actors":["Leonardo DiCaprio"],"directors":["Christopher Nolan"],"pageSize":25}'
+```
+
+`name` searches primary and original titles and aliases, including prefix and limited fuzzy matches. Each actor and director name resolves to one IMDb person ID before movie retrieval. The movie query requires the title match and **every** supplied actor and director ID, so attributes use AND semantics. Omit unused fields; an empty actor or director array has no effect. A request without any search attribute, a blank name, or a blank person entry returns `400`.
+
+`pageSize` defaults to 100 and must be between 1 and 100. Results are ordered by IMDb movie ID for deterministic pages. The response has a `movies` array and `pagination` object. Each movie includes `id`, `title`, nullable `year`, `rating`, and `voteCount`, plus `matchedAttributes` with a `nameMatch` value (`PRIMARY_TITLE`, `ORIGINAL_TITLE`, `ALIAS`, or `TEXT`) and the resolved actor and director names. `nameMatch` is `null` without a title query. Pagination includes `pageSize`, `returnedCount`, `totalMatches`, `hasMore`, and nullable `nextCursor`. Pass `nextCursor` as the request's `cursor` to get the next page. The cursor uses OpenSearch `search_after`, is tied to the search attributes, and returns `400` if malformed or used with another search. Unknown people return `404`; ambiguous people return `409` with candidate IDs and names. A valid query with no matching movies returns `200` with an empty array. Pages remain stable for an unchanged index; refreshes can change the result set between requests.
+
+## License and attribution
 
 IMDb permits these files only for personal and non-commercial use, subject to its [usage conditions](https://help.imdb.com/article/imdb/general-information/can-i-use-imdb-data-in-my-software/G5JTRESSHJBBHTGX) and the license information supplied with the data. IMDb prohibits altering, republishing, reselling, or repurposing the data to create an online or offline movie database except for individual personal use, and it may withdraw permission. Do not redistribute either the downloaded files or a derived movie database.
 
@@ -107,7 +119,7 @@ Wikidata, TMDB, studio datasets, and studio search are explicitly outside the MV
 
 The Java [movie ranker](src/main/java/com/moviefinder/ranking/MovieRanker.java) orders a supplied candidate set. It accepts normalized title relevance, the title match type (`PRIMARY_EXACT`, `ALIAS_EXACT`, `OTHER`, or `NONE`), requested and matched actor/director counts, IMDb rating, and vote count. Primary-title exact matches precede exact aliases, which precede other matches. Within a title tier, the default score gives 40 points to title relevance, 25 to the fraction of requested people matched, 25 to Bayesian rating quality, and 10 to logarithmic vote popularity. The Bayesian rating uses a 6.0 prior with 1,000 prior votes; popularity is capped at 1,000,000 votes. Missing ratings receive no quality points. The returned breakdown includes each contribution, the Bayesian rating, and the total score. Equal scores are ordered by IMDb movie ID. `RankingConfig` makes all weights and priors explicit and replaceable in tests or future configuration.
 
-Ranking applies only to movies passed to the ranker. The current person lookup still selects up to 100 movies by ID; ranking that limited set would not guarantee the best movies across the complete index. The future composite search and cursor pagination must select candidates and preserve the ranking order across pages.
+Ranking applies only to movies passed to the ranker. The search API currently returns movie-ID order to paginate the complete matching set. Applying the ranker to one limited page would not guarantee the best movies across the complete index; integrating ranked search requires a backend sort that preserves the ranking order across pages.
 
 ## Run locally
 

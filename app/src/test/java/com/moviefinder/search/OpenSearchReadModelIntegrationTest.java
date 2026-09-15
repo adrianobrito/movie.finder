@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,6 +166,69 @@ class OpenSearchReadModelIntegrationTest {
                 .movies().candidates()).isEmpty();
         assertThat(search.search("Alex Carter", MoviePersonSearch.Role.CAST, 10)
                 .resolution().status()).isEqualTo(PersonResolver.Status.AMBIGUOUS);
+    }
+
+    @Test
+    void compositeSearchUsesTitlesAliasesAllPersonIdsAndStableCursorPages()
+            throws IOException, InterruptedException {
+        Path canonical = Files.createDirectory(temp.resolve("composite-canonical"));
+        Files.writeString(canonical.resolve("people.ndjson"), """
+                {"id":"nm1001","primaryName":"Leonardo DiCaprio","normalizedName":"leonardo dicaprio","professions":["actor"],"knownForTitleIds":[]}
+                {"id":"nm1002","primaryName":"Christopher Nolan","normalizedName":"christopher nolan","professions":["director"],"knownForTitleIds":[]}
+                {"id":"nm1003","primaryName":"Kate Example","normalizedName":"kate example","professions":["actress"],"knownForTitleIds":[]}
+                {"id":"nm1004","primaryName":"Other Director","normalizedName":"other director","professions":["director"],"knownForTitleIds":[]}
+                """, UTF_8);
+        Files.writeString(canonical.resolve("movies.ndjson"), """
+                {"id":"tt1001","primaryTitle":"Inception","originalTitle":"Inception","aliases":["Dreams Begin"],"releaseYear":2010,"castPersonIds":["nm1001"],"directorPersonIds":["nm1002"],"genres":[],"averageRating":8.8,"voteCount":2000000}
+                {"id":"tt1002","primaryTitle":"Inception Echo","originalTitle":"Inception Echo","aliases":[],"releaseYear":2020,"castPersonIds":["nm1001"],"directorPersonIds":["nm1004"],"genres":[],"averageRating":null,"voteCount":null}
+                {"id":"tt1003","primaryTitle":"Another Dream","originalTitle":"Another Dream","aliases":["Inception","The Beginning"],"releaseYear":2021,"castPersonIds":["nm1001","nm1003"],"directorPersonIds":["nm1002"],"genres":[],"averageRating":7.0,"voteCount":100}
+                {"id":"tt1004","primaryTitle":"No Match","originalTitle":"No Match","aliases":[],"releaseYear":2022,"castPersonIds":["nm1003"],"directorPersonIds":["nm1002"],"genres":[],"averageRating":null,"voteCount":null}
+                """, UTF_8);
+        model.indexCanonical(canonical, false);
+        post("people/_refresh", "{}");
+        post("movies/_refresh", "{}");
+
+        OpenSearchSearchClient client = new OpenSearchSearchClient(url);
+        MovieSearchService search = new MovieSearchService(
+                new PersonResolver(new OpenSearchPersonLookup(client)),
+                new OpenSearchCompositeMovieLookup(client));
+
+        assertThat(ids(search.search(request("Inception", null, null, 100, null))))
+                .contains("tt1001", "tt1002", "tt1003");
+        assertThat(ids(search.search(request("The Beginning", null, null, 100, null))))
+                .containsExactly("tt1003");
+        assertThat(ids(search.search(request(null, List.of("Leonardo DiCaprio"), null, 100, null))))
+                .containsExactly("tt1001", "tt1002", "tt1003");
+        assertThat(ids(search.search(request(null, null, List.of("Christopher Nolan"), 100, null))))
+                .containsExactly("tt1001", "tt1003", "tt1004");
+        assertThat(ids(search.search(request("Inception", List.of("Leonardo DiCaprio"),
+                List.of("Christopher Nolan"), 100, null))))
+                .containsExactly("tt1001", "tt1003");
+        assertThat(ids(search.search(request(null, List.of("Leonardo DiCaprio", "Kate Example"),
+                List.of("Christopher Nolan"), 100, null))))
+                .containsExactly("tt1003");
+        assertThat(ids(search.search(request("No Match", List.of("Leonardo DiCaprio"),
+                List.of("Christopher Nolan"), 100, null)))).isEmpty();
+
+        String cursor = null;
+        List<String> paged = new java.util.ArrayList<>();
+        do {
+            MovieSearchService.SearchResponse page = search.search(request(null,
+                    List.of("Leonardo DiCaprio"), null, 1, cursor));
+            paged.addAll(ids(page));
+            assertThat(page.pagination().totalMatches()).isEqualTo(3);
+            cursor = page.pagination().nextCursor();
+        } while (cursor != null);
+        assertThat(paged).containsExactly("tt1001", "tt1002", "tt1003");
+    }
+
+    private static MovieSearchService.SearchRequest request(String title, List<String> actors,
+            List<String> directors, int pageSize, String cursor) {
+        return new MovieSearchService.SearchRequest(title, actors, directors, pageSize, cursor);
+    }
+
+    private static List<String> ids(MovieSearchService.SearchResponse response) {
+        return response.movies().stream().map(MovieSearchService.MovieResult::id).toList();
     }
 
     private long hitCount(String path, String body) throws IOException, InterruptedException {
