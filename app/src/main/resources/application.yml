@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: movie-finder
+  profiles:
+    default: local
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.moviefinder: INFO

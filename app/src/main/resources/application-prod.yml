@@ -1,0 +1,13 @@
+spring:
+  main:
+    banner-mode: "off"
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.moviefinder: INFO

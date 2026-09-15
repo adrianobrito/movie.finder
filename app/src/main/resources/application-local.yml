@@ -1,0 +1,8 @@
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.moviefinder: DEBUG
