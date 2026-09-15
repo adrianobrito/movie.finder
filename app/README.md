@@ -53,6 +53,22 @@ The destination is selected in this order: the `imdbDataDir` Gradle property, th
 
 The downloader validates the HTTP response, non-empty gzip stream, gzip checksum, and exact IMDb TSV header before atomically replacing a destination file. A failed refresh leaves the previous file intact, removes the partial download, prints a downloaded/skipped/failed summary, and exits non-zero.
 
+## IMDb import
+
+Run the Java ingestion task after acquiring the six archives:
+
+```powershell
+.\gradlew.bat importImdbDatasets
+```
+
+The task reads `imdbDataDir` / `IMDB_DATA_DIR` / `data/imdb/raw`, in that order, and writes to `imdbOutputDir` / `IMDB_OUTPUT_DIR` / `data/imdb/canonical`. For example, to import archives in another directory:
+
+```powershell
+.\gradlew.bat importImdbDatasets -PimdbDataDir=C:/data/movie-finder/imdb -PimdbOutputDir=C:/data/movie-finder/canonical
+```
+
+The output files are `movies.ndjson` and `people.ndjson`, one JSON record per line. Movie records contain title ID, names, sorted aliases, release year, sorted cast and director person IDs, genres, rating, and vote count. Person records contain person ID, name, normalized name, professions, and known-for movie IDs. The ID links join movies to people and can be used to enrich the future search index with cast and director names. Only non-adult `movie` and `tvMovie` titles are included. Missing years and ratings become JSON `null`; duplicate aliases and links are removed. Links to people absent from the names archive are omitted and counted as `missing_linked_people`. The importer reports read, accepted, rejected, and filtered rows for every archive, plus output counts and duration. It logs invalid rows with the archive and line number, then continues. Missing files, bad headers, corrupt gzip streams, and output failures stop the import; existing output files are preserved until replacements are ready. Re-running with the same archives produces byte-identical records. Local canonical output is ignored by Git and must not be redistributed.
+
 ### License and attribution
 
 IMDb permits these files only for personal and non-commercial use, subject to its [usage conditions](https://help.imdb.com/article/imdb/general-information/can-i-use-imdb-data-in-my-software/G5JTRESSHJBBHTGX) and the license information supplied with the data. IMDb prohibits altering, republishing, reselling, or repurposing the data to create an online or offline movie database except for individual personal use, and it may withdraw permission. Do not redistribute either the downloaded files or a derived movie database.

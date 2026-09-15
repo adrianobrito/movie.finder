@@ -51,3 +51,23 @@ tasks.register('downloadImdbDatasets', JavaExec) {
         setArgs(['--destination', destination] + (refresh ? ['--refresh'] : []))
     }
 }
+
+tasks.register('importImdbDatasets', JavaExec) {
+    group = 'data'
+    description = 'Imports the six IMDb archives into canonical movie and person NDJSON files.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.moviefinder.ingestion.ImdbIngestionPipeline'
+    maxHeapSize = '3g'
+
+    doFirst {
+        def source = providers.gradleProperty('imdbDataDir')
+                .orElse(providers.environmentVariable('IMDB_DATA_DIR'))
+                .orElse('data/imdb/raw')
+                .get()
+        def destination = providers.gradleProperty('imdbOutputDir')
+                .orElse(providers.environmentVariable('IMDB_OUTPUT_DIR'))
+                .orElse('data/imdb/canonical')
+                .get()
+        setArgs(['--source', source, '--destination', destination])
+    }
+}

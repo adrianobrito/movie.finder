@@ -1,6 +1,7 @@
 .gradle/
 build/
 out/
+bin/
 
 *.iml
 .idea/
@@ -14,4 +15,5 @@ hs_err_pid*
 
 # IMDb archives are downloaded locally and must not be redistributed.
 data/imdb/raw/
+data/imdb/canonical/
 *.tsv.gz.part
