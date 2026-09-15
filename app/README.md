@@ -93,7 +93,7 @@ People are bulk indexed first. Movie batches use OpenSearch realtime multi-get t
 
 The Testcontainers integration tests use the same OpenSearch image and exercise index creation, canonical bulk indexing, exact ID filters, prefix/alias matching, and fuzzy title matching. They run automatically when a Docker-compatible container runtime is available.
 
-The Java [person resolver](src/main/java/com/moviefinder/search/PersonResolver.java) searches the `people` index for exact and normalized names first, then prefix matches, then limited fuzzy matches. It returns the IMDb person ID and display name when exactly one person matches the best available tier. Multiple matches return an explicit `AMBIGUOUS` status, candidate IDs and names, and the full candidate count (up to 20 candidates are shown); no match returns `NOT_FOUND`. [Movie person search](src/main/java/com/moviefinder/search/MoviePersonSearch.java) queries `castPersonIds` or `directorPersonIds` only after unique resolution and does not query movies for ambiguous or missing people. These Java services provide the person-filtering behavior for the forthcoming search API; movie results are currently sorted by ID until ranking and pagination are added.
+The Java [person resolver](src/main/java/com/moviefinder/search/PersonResolver.java) searches the `people` index for exact and normalized names first, then prefix matches, then limited fuzzy matches. It returns the IMDb person ID and display name when exactly one person matches the best available tier. Multiple matches return an explicit `AMBIGUOUS` status, candidate IDs and names, and the full candidate count (up to 20 candidates are shown); no match returns `NOT_FOUND`. [Movie person search](src/main/java/com/moviefinder/search/MoviePersonSearch.java) queries `castPersonIds` or `directorPersonIds` only after unique resolution and does not query movies for ambiguous or missing people. These Java services provide the person-filtering behavior for the forthcoming search API; movie results are currently sorted by ID until ranking and pagination are integrated.
 
 ### License and attribution
 
@@ -102,6 +102,12 @@ IMDb permits these files only for personal and non-commercial use, subject to it
 Required attribution: Information courtesy of [IMDb](https://www.imdb.com). Used with permission.
 
 Wikidata, TMDB, studio datasets, and studio search are explicitly outside the MVP data scope. The six IMDb files above are sufficient for movie-title, actor/actress, and director queries.
+
+## Movie ranking
+
+The Java [movie ranker](src/main/java/com/moviefinder/ranking/MovieRanker.java) orders a supplied candidate set. It accepts normalized title relevance, the title match type (`PRIMARY_EXACT`, `ALIAS_EXACT`, `OTHER`, or `NONE`), requested and matched actor/director counts, IMDb rating, and vote count. Primary-title exact matches precede exact aliases, which precede other matches. Within a title tier, the default score gives 40 points to title relevance, 25 to the fraction of requested people matched, 25 to Bayesian rating quality, and 10 to logarithmic vote popularity. The Bayesian rating uses a 6.0 prior with 1,000 prior votes; popularity is capped at 1,000,000 votes. Missing ratings receive no quality points. The returned breakdown includes each contribution, the Bayesian rating, and the total score. Equal scores are ordered by IMDb movie ID. `RankingConfig` makes all weights and priors explicit and replaceable in tests or future configuration.
+
+Ranking applies only to movies passed to the ranker. The current person lookup still selects up to 100 movies by ID; ranking that limited set would not guarantee the best movies across the complete index. The future composite search and cursor pagination must select candidates and preserve the ranking order across pages.
 
 ## Run locally
 
