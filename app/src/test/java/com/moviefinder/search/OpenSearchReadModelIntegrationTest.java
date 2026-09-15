@@ -120,6 +120,53 @@ class OpenSearchReadModelIntegrationTest {
         assertThat(get("people/_count").path("count").asLong()).isZero();
     }
 
+    @Test
+    void resolvesNamesAndFiltersMoviesByCanonicalPersonIds() throws IOException, InterruptedException {
+        Path canonical = Files.createDirectory(temp.resolve("resolution-canonical"));
+        Files.writeString(canonical.resolve("people.ndjson"), """
+                {"id":"nm0000138","primaryName":"Leonardo DiCaprio","normalizedName":"leonardo dicaprio","professions":["actor"],"knownForTitleIds":["tt1375666"]}
+                {"id":"nm8000001","primaryName":"Christopher Nolan","normalizedName":"christopher nolan","professions":["director"],"knownForTitleIds":["tt1375666"]}
+                {"id":"nm1000001","primaryName":"Alex Carter","normalizedName":"alex carter","professions":["actor"],"knownForTitleIds":["tt9000000001"]}
+                {"id":"nm1000002","primaryName":"Alex Carter","normalizedName":"alex carter","professions":["director"],"knownForTitleIds":["tt9000000001"]}
+                """, UTF_8);
+        Files.writeString(canonical.resolve("movies.ndjson"), """
+                {"id":"tt1375666","primaryTitle":"Inception","originalTitle":"Inception","aliases":[],"releaseYear":2010,"castPersonIds":["nm0000138"],"directorPersonIds":["nm8000001"],"genres":["Sci-Fi"],"averageRating":8.8,"voteCount":2000000}
+                {"id":"tt9000000001","primaryTitle":"Other Movie","originalTitle":"Other Movie","aliases":[],"releaseYear":2020,"castPersonIds":["nm1000001"],"directorPersonIds":["nm1000002"],"genres":[],"averageRating":null,"voteCount":null}
+                """, UTF_8);
+        model.indexCanonical(canonical, false);
+        post("people/_refresh", "{}");
+        post("movies/_refresh", "{}");
+
+        OpenSearchSearchClient client = new OpenSearchSearchClient(url);
+        PersonResolver resolver = new PersonResolver(new OpenSearchPersonLookup(client));
+        MoviePersonSearch search = new MoviePersonSearch(resolver, new OpenSearchMovieLookup(client));
+
+        assertThat(resolver.resolve("Leonardo DiCaprio").person().id()).isEqualTo("nm0000138");
+        assertThat(resolver.resolve("LEONARDO DICAPRIO").person().id()).isEqualTo("nm0000138");
+        assertThat(resolver.resolve("  Leonardo   DiCaprio  ").person().id()).isEqualTo("nm0000138");
+        assertThat(resolver.resolve("Leonardo Di").matchTier()).isEqualTo(PersonResolver.MatchTier.PREFIX);
+        PersonResolver.Resolution typo = resolver.resolve("Leonrdo DiCaprio");
+        assertThat(typo.matchTier()).isEqualTo(PersonResolver.MatchTier.FUZZY);
+        assertThat(typo.person().id()).isEqualTo("nm0000138");
+        assertThat(resolver.resolve("Alex Carter").status()).isEqualTo(PersonResolver.Status.AMBIGUOUS);
+        assertThat(resolver.resolve("Alex Carter").candidates())
+                .extracting(PersonResolver.PersonCandidate::id).containsExactly("nm1000001", "nm1000002");
+        assertThat(resolver.resolve("zzzzxxxx yyyyqqqq").status()).isEqualTo(PersonResolver.Status.NOT_FOUND);
+
+        MoviePersonSearch.SearchResult cast = search.search("Leonardo DiCaprio",
+                MoviePersonSearch.Role.CAST, 10);
+        assertThat(cast.movies().candidates()).extracting(MoviePersonSearch.MovieCandidate::id)
+                .containsExactly("tt1375666");
+        assertThat(cast.movies().total()).isEqualTo(1);
+        assertThat(search.search("Christopher Nolan", MoviePersonSearch.Role.DIRECTOR, 10)
+                .movies().candidates()).extracting(MoviePersonSearch.MovieCandidate::id)
+                .containsExactly("tt1375666");
+        assertThat(search.search("Leonardo DiCaprio", MoviePersonSearch.Role.DIRECTOR, 10)
+                .movies().candidates()).isEmpty();
+        assertThat(search.search("Alex Carter", MoviePersonSearch.Role.CAST, 10)
+                .resolution().status()).isEqualTo(PersonResolver.Status.AMBIGUOUS);
+    }
+
     private long hitCount(String path, String body) throws IOException, InterruptedException {
         return post(path, body).path("hits").path("total").path("value").asLong();
     }

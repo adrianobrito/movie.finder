@@ -93,6 +93,8 @@ People are bulk indexed first. Movie batches use OpenSearch realtime multi-get t
 
 The Testcontainers integration tests use the same OpenSearch image and exercise index creation, canonical bulk indexing, exact ID filters, prefix/alias matching, and fuzzy title matching. They run automatically when a Docker-compatible container runtime is available.
 
+The Java [person resolver](src/main/java/com/moviefinder/search/PersonResolver.java) searches the `people` index for exact and normalized names first, then prefix matches, then limited fuzzy matches. It returns the IMDb person ID and display name when exactly one person matches the best available tier. Multiple matches return an explicit `AMBIGUOUS` status, candidate IDs and names, and the full candidate count (up to 20 candidates are shown); no match returns `NOT_FOUND`. [Movie person search](src/main/java/com/moviefinder/search/MoviePersonSearch.java) queries `castPersonIds` or `directorPersonIds` only after unique resolution and does not query movies for ambiguous or missing people. These Java services provide the person-filtering behavior for the forthcoming search API; movie results are currently sorted by ID until ranking and pagination are added.
+
 ### License and attribution
 
 IMDb permits these files only for personal and non-commercial use, subject to its [usage conditions](https://help.imdb.com/article/imdb/general-information/can-i-use-imdb-data-in-my-software/G5JTRESSHJBBHTGX) and the license information supplied with the data. IMDb prohibits altering, republishing, reselling, or repurposing the data to create an online or offline movie database except for individual personal use, and it may withdraw permission. Do not redistribute either the downloaded files or a derived movie database.
