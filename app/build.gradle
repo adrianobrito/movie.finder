@@ -22,6 +22,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:testcontainers:2.0.5'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter:2.0.5'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -69,5 +71,27 @@ tasks.register('importImdbDatasets', JavaExec) {
                 .orElse('data/imdb/canonical')
                 .get()
         setArgs(['--source', source, '--destination', destination])
+    }
+}
+
+tasks.register('indexImdbDatasets', JavaExec) {
+    group = 'data'
+    description = 'Creates the OpenSearch read model and bulk indexes canonical IMDb records.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.moviefinder.search.OpenSearchIndexer'
+
+    doFirst {
+        def source = providers.gradleProperty('imdbOutputDir')
+                .orElse(providers.environmentVariable('IMDB_OUTPUT_DIR'))
+                .orElse('data/imdb/canonical')
+                .get()
+        def url = providers.gradleProperty('opensearchUrl')
+                .orElse(providers.environmentVariable('OPENSEARCH_URL'))
+                .orElse('http://localhost:9200')
+                .get()
+        def recreate = providers.gradleProperty('opensearchRecreate')
+                .map { value -> value.toBoolean() }
+                .getOrElse(false)
+        setArgs(['--source', source, '--url', url] + (recreate ? ['--recreate'] : []))
     }
 }

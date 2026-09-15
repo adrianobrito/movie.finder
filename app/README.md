@@ -8,6 +8,7 @@ Movie Finder is a movie recommendation and search service. The MVP is implemente
 - Spring Boot 4.1
 - Gradle 8.14 (via the included wrapper)
 - JUnit 5
+- OpenSearch 3.8 for the movie and person read model
 
 ## Build and test
 
@@ -68,6 +69,29 @@ The task reads `imdbDataDir` / `IMDB_DATA_DIR` / `data/imdb/raw`, in that order,
 ```
 
 The output files are `movies.ndjson` and `people.ndjson`, one JSON record per line. Movie records contain title ID, names, sorted aliases, release year, sorted cast and director person IDs, genres, rating, and vote count. Person records contain person ID, name, normalized name, professions, and known-for movie IDs. The ID links join movies to people and can be used to enrich the future search index with cast and director names. Only non-adult `movie` and `tvMovie` titles are included. Missing years and ratings become JSON `null`; duplicate aliases and links are removed. Links to people absent from the names archive are omitted and counted as `missing_linked_people`. The importer reports read, accepted, rejected, and filtered rows for every archive, plus output counts and duration. It logs invalid rows with the archive and line number, then continues. Missing files, bad headers, corrupt gzip streams, and output failures stop the import; existing output files are preserved until replacements are ready. Re-running with the same archives produces byte-identical records. Local canonical output is ignored by Git and must not be redistributed.
+
+## OpenSearch read model
+
+Start the local single-node OpenSearch service, then index the canonical output:
+
+```powershell
+docker compose up -d
+.\gradlew.bat indexImdbDatasets
+```
+
+`indexImdbDatasets` creates the `people` and `movies` indexes from the version-controlled [people mapping](src/main/resources/opensearch/people-v1.json) and [movies mapping](src/main/resources/opensearch/movies-v1.json). It reads `imdbOutputDir` / `IMDB_OUTPUT_DIR` / `data/imdb/canonical` in that order, and connects to `opensearchUrl` / `OPENSEARCH_URL` / `http://localhost:9200`. For a cluster requiring basic authentication, set both `OPENSEARCH_USERNAME` and `OPENSEARCH_PASSWORD`. The local Compose service disables OpenSearch security and binds only to `127.0.0.1`.
+
+Indexing retains existing indexes by default. To delete and recreate both indexes before a full refresh, run:
+
+```powershell
+.\gradlew.bat indexImdbDatasets -PopensearchRecreate=true
+```
+
+For example, an alternate cluster and canonical directory can be selected with `-PopensearchUrl=http://localhost:9201 -PimdbOutputDir=C:/data/movie-finder/canonical`. A full refresh is `downloadImdbDatasets -PimdbRefresh=true`, then `importImdbDatasets`, then `indexImdbDatasets -PopensearchRecreate=true`. Recreating removes the old documents; indexing without recreation replaces records with matching IMDb IDs but does not remove IDs missing from the new data.
+
+People are bulk indexed first. Movie batches use OpenSearch realtime multi-get to resolve their cast and director IDs into display names, then are bulk indexed under their IMDb title IDs. Batches contain at most 500 records; a bulk item error stops the task and reports the rejected ID. IDs and person links are `keyword` fields for exact filters. Names, titles, and aliases use lowercase and accent-folding text analyzers, with `.raw` keyword fields for exact name/title matching and `.prefix` text fields for prefix queries. Limited typo tolerance belongs in search queries via OpenSearch `fuzziness: "AUTO"`; the mapping does not silently apply fuzzy matching to every query.
+
+The Testcontainers integration tests use the same OpenSearch image and exercise index creation, canonical bulk indexing, exact ID filters, prefix/alias matching, and fuzzy title matching. They run automatically when a Docker-compatible container runtime is available.
 
 ### License and attribution
 

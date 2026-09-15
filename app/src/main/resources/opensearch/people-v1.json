@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "index": { "max_ngram_diff": 13 },
+    "analysis": {
+      "filter": {
+        "name_prefix_grams": { "type": "edge_ngram", "min_gram": 2, "max_gram": 15 }
+      },
+      "analyzer": {
+        "name_text": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding"] },
+        "name_prefix": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "name_prefix_grams"] }
+      },
+      "normalizer": {
+        "name_keyword": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id": { "type": "keyword" },
+      "primaryName": {
+        "type": "text", "analyzer": "name_text",
+        "fields": {
+          "raw": { "type": "keyword", "normalizer": "name_keyword" },
+          "prefix": { "type": "text", "analyzer": "name_prefix", "search_analyzer": "name_text" }
+        }
+      },
+      "normalizedName": { "type": "keyword", "normalizer": "name_keyword" },
+      "professions": { "type": "keyword" },
+      "knownForTitleIds": { "type": "keyword" }
+    }
+  }
+}

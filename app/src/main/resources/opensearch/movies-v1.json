@@ -1,0 +1,43 @@
+{
+  "settings": {
+    "index": { "max_ngram_diff": 13 },
+    "analysis": {
+      "filter": {
+        "title_prefix_grams": { "type": "edge_ngram", "min_gram": 2, "max_gram": 15 }
+      },
+      "analyzer": {
+        "title_text": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding"] },
+        "title_prefix": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "title_prefix_grams"] }
+      },
+      "normalizer": {
+        "title_keyword": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id": { "type": "keyword" },
+      "primaryTitle": {
+        "type": "text", "analyzer": "title_text",
+        "fields": {
+          "raw": { "type": "keyword", "normalizer": "title_keyword" },
+          "prefix": { "type": "text", "analyzer": "title_prefix", "search_analyzer": "title_text" }
+        }
+      },
+      "originalTitle": { "type": "text", "analyzer": "title_text" },
+      "aliases": {
+        "type": "text", "analyzer": "title_text",
+        "fields": { "prefix": { "type": "text", "analyzer": "title_prefix", "search_analyzer": "title_text" } }
+      },
+      "releaseYear": { "type": "integer" },
+      "castPersonIds": { "type": "keyword" },
+      "castNames": { "type": "text", "analyzer": "title_text" },
+      "directorPersonIds": { "type": "keyword" },
+      "directorNames": { "type": "text", "analyzer": "title_text" },
+      "genres": { "type": "keyword" },
+      "averageRating": { "type": "float" },
+      "voteCount": { "type": "long" }
+    }
+  }
+}
