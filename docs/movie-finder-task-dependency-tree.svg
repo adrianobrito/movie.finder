@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2200" viewBox="0 0 1800 2200">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 z" fill="#111"/>
+    </marker>
+    <style>
+      .title { font: 700 58px Arial, Helvetica, sans-serif; fill:#111; }
+      .subtitle { font: 28px Arial, Helvetica, sans-serif; fill:#222; }
+      .node-title { font: 700 29px Arial, Helvetica, sans-serif; fill:#111; }
+      .node-body { font: 24px Arial, Helvetica, sans-serif; fill:#222; }
+      .small { font: 22px Arial, Helvetica, sans-serif; fill:#222; }
+      .small-bold { font: 700 22px Arial, Helvetica, sans-serif; fill:#111; }
+      .box { fill:#fff; stroke:#111; stroke-width:4; rx:24; }
+      .edge { fill:none; stroke:#111; stroke-width:4; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1800" height="2200" fill="#fff"/>
+  <text x="90" y="120" class="title">movie.finder — MVP Task Dependency Tree</text>
+  <text x="90" y="175" class="subtitle">Java 21 / Spring Boot • IMDb public datasets • OpenSearch • max page size 100</text>
+  <line x1="90" y1="205" x2="1710" y2="205" stroke="#111" stroke-width="3"/>
+
+  <!-- dependency arrows -->
+  <path class="edge" d="M460 410 L720 500"/>
+  <path class="edge" d="M1340 410 L1080 500"/>
+  <path class="edge" d="M900 665 L900 760"/>
+  <path class="edge" d="M720 925 L460 1040"/>
+  <path class="edge" d="M1080 925 L1340 1040"/>
+  <path class="edge" d="M460 1205 L720 1330"/>
+  <path class="edge" d="M1340 1205 L1080 1330"/>
+  <path class="edge" d="M900 1495 L900 1590"/>
+  <path class="edge" d="M900 1740 L900 1830"/>
+  <path class="edge" d="M900 1980 L900 2050"/>
+
+  <!-- #1 -->
+  <rect class="box" x="110" y="260" width="700" height="150"/>
+  <text x="138" y="312" class="node-title">#1  Bootstrap service in Java</text>
+  <text x="138" y="360" class="node-body">Java 21, Spring Boot, build/test skeleton,</text>
+  <text x="138" y="393" class="node-body">health checks and project structure</text>
+
+  <!-- #2 -->
+  <rect class="box" x="990" y="260" width="700" height="150"/>
+  <text x="1018" y="312" class="node-title">#2  Obtain public movie datasets</text>
+  <text x="1018" y="360" class="node-body">IMDb title, aliases, principals, crew,</text>
+  <text x="1018" y="393" class="node-body">people and ratings datasets</text>
+
+  <text x="90" y="470" class="small-bold">Parallel roots</text>
+  <text x="90" y="500" class="small">#1 and #2 can start immediately.</text>
+
+  <!-- #3 -->
+  <rect class="box" x="550" y="500" width="700" height="165"/>
+  <text x="578" y="552" class="node-title">#3  IMDb ingestion &amp; normalization</text>
+  <text x="578" y="600" class="node-body">Parse + join IMDb TSV files in Java;</text>
+  <text x="578" y="633" class="node-body">produce canonical movie/person records</text>
+
+  <!-- #4 -->
+  <rect class="box" x="550" y="760" width="700" height="165"/>
+  <text x="578" y="812" class="node-title">#4  OpenSearch indexes</text>
+  <text x="578" y="860" class="node-body">Create movies + people indexes;</text>
+  <text x="578" y="893" class="node-body">bulk-index canonical records</text>
+
+  <!-- #5 -->
+  <rect class="box" x="110" y="1040" width="700" height="165"/>
+  <text x="138" y="1092" class="node-title">#5  Person entity resolution</text>
+  <text x="138" y="1140" class="node-body">Resolve actor/director names to canonical</text>
+  <text x="138" y="1173" class="node-body">IMDb person IDs</text>
+
+  <!-- #7 -->
+  <rect class="box" x="990" y="1040" width="700" height="165"/>
+  <text x="1018" y="1092" class="node-title">#7  Deterministic ranking</text>
+  <text x="1018" y="1140" class="node-body">Explainable Java ranking using title relevance,</text>
+  <text x="1018" y="1173" class="node-body">rating quality and vote count</text>
+
+  <text x="90" y="1240" class="small-bold">Parallel middle layer</text>
+  <text x="90" y="1270" class="small">#5 entity resolution and #7 ranking can proceed in parallel after #4.</text>
+
+  <!-- #6 -->
+  <rect class="box" x="550" y="1330" width="700" height="165"/>
+  <text x="578" y="1382" class="node-title">#6  Composite movie search API</text>
+  <text x="578" y="1430" class="node-body">Search by name / actor / director with AND</text>
+  <text x="578" y="1463" class="node-body">semantics and page size ≤ 100</text>
+
+  <!-- #8 -->
+  <rect class="box" x="550" y="1590" width="700" height="150"/>
+  <text x="578" y="1642" class="node-title">#8  Cursor-based pagination</text>
+  <text x="578" y="1690" class="node-body">OpenSearch search_after + opaque Java cursor</text>
+
+  <!-- #9 -->
+  <rect class="box" x="550" y="1830" width="700" height="150"/>
+  <text x="578" y="1882" class="node-title">#9  End-to-end tests</text>
+  <text x="578" y="1930" class="node-body">Testcontainers + deterministic fixtures covering</text>
+  <text x="578" y="1963" class="node-body">ingestion, ranking, API and pagination</text>
+
+  <!-- #10 -->
+  <rect class="box" x="550" y="2050" width="700" height="120"/>
+  <text x="578" y="2102" class="node-title">#10  Final documentation</text>
+  <text x="578" y="2145" class="node-body">Local setup, refresh/reindex flow, API usage and MVP limitations</text>
+
+  <text x="90" y="2188" class="small">Dependency order inferred from issue requirements; not native GitHub blocked-by relationships.</text>
+</svg>
