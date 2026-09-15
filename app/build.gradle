@@ -32,3 +32,22 @@ tasks.named('test') {
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
+
+tasks.register('downloadImdbDatasets', JavaExec) {
+    group = 'data'
+    description = 'Downloads and validates the IMDb datasets required by the MVP.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.moviefinder.ingestion.ImdbDatasetDownloader'
+
+    doFirst {
+        def destination = providers.gradleProperty('imdbDataDir')
+                .orElse(providers.environmentVariable('IMDB_DATA_DIR'))
+                .orElse('data/imdb/raw')
+                .get()
+        def refresh = providers.gradleProperty('imdbRefresh')
+                .map { value -> value.toBoolean() }
+                .getOrElse(false)
+
+        setArgs(['--destination', destination] + (refresh ? ['--refresh'] : []))
+    }
+}
